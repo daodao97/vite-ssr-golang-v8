@@ -1,0 +1,171 @@
+{
+  "orderBy": {
+    "field": "id",
+    "mod": "desc"
+  },
+  "formItems": [
+    {
+      "field": "mail",
+      "label": "邮箱",
+      "type": "input",
+      "rules": "required|email"
+    },
+    {
+      "field": "mail_pwd",
+      "label": "邮箱密码",
+      "type": "input"
+    },
+    {
+      "field": "gpt_pwd",
+      "label": "GPT 密码",
+      "type": "input"
+    },
+    {
+      "field": "rt",
+      "label": "Refresh Token",
+      "type": "textarea"
+    },
+    {
+      "field": "used",
+      "label": "状态",
+      "type": "select",
+      "value": 1,
+      "options": [
+        {
+          "value": 1,
+          "label": "未使用"
+        },
+        {
+          "value": 2,
+          "label": "已使用"
+        }
+      ]
+    }
+  ],
+  "filter": [
+    {
+      "field": "id",
+      "label": "ID"
+    },
+    {
+      "field": "mail",
+      "label": "邮箱"
+    },
+    {
+      "field": "used",
+      "label": "状态",
+      "type": "select",
+      "options": [
+        {
+          "value": 1,
+          "label": "未使用"
+        },
+        {
+          "value": 2,
+          "label": "已使用"
+        }
+      ]
+    }
+  ],
+  "headers": [
+    {
+      "field": "id",
+      "label": "ID",
+      "sortable": true
+    },
+    {
+      "field": "mail",
+      "label": "邮箱"
+    },
+    {
+      "field": "used",
+      "label": "状态",
+      "type": "enum",
+      "options": [
+        {
+          "value": 1,
+          "label": "未使用"
+        },
+        {
+          "value": 2,
+          "label": "已使用"
+        }
+      ],
+      "state": {
+        "1": "success",
+        "2": "info"
+      }
+    },
+    {
+      "field": "gpt_pwd",
+      "label": "GPT 密码"
+    },
+    {
+      "field": "rt",
+      "label": "RT"
+    }
+  ],
+  "normalButton": [
+    {
+      "props": {
+        "type": "success"
+      },
+      "target": "/team_mails/form",
+      "text": "新增",
+      "type": "jump"
+    },
+    {
+      "props": {
+        "type": "info"
+      },
+      "extra": {
+        "formItems": [
+          {
+            "field": "mails",
+            "label": "Mails",
+            "type": "textarea"
+          }
+        ],
+        "saveApi": "/team_mails_batch_insert",
+        "method": "POST"
+      },
+      "text": "批量添加",
+      "type": "form"
+    }
+  ],
+  "rowButton": [
+    {
+      "extra": {
+        "type": "GetRTAT",
+        "id": "",
+        "test": 1
+      },
+      "props": {
+        "size": "small"
+      },
+      "text": "RT/AT",
+      "type": "modal"
+    },
+    {
+      "props": {
+        "type": "primary",
+        "size": "small"
+      },
+      "target": "/team_mails/{id}",
+      "text": "编辑",
+      "type": "jump"
+    },
+    {
+      "props": {
+        "type": "danger",
+        "size": "small"
+      },
+      "extra": {
+        "method": "DELTED"
+      },
+      "target": "/team_mails/del",
+      "text": "删除",
+      "type": "api"
+    }
+  ]
+}

@@ -1,0 +1,362 @@
+package pkg
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"io"
+	"io/fs"
+	"log"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"os"
+	"regexp"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/revenkroz/vite-ssr-golang/pkg/locales"
+	"github.com/revenkroz/vite-ssr-golang/pkg/renderer"
+	"github.com/revenkroz/vite-ssr-golang/pkg/routematcher"
+)
+
+type FrontendBuild struct {
+	FrontendDist fs.FS
+	ServerDist   fs.FS
+}
+
+type BackendDataFetcher func(context.Context, *http.Request) (routematcher.SSRPayload, error)
+
+var langAttributePattern = regexp.MustCompile(`lang="[^"]*"`)
+
+func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher BackendDataFetcher) {
+	devMode := isDevMode()
+	router.GET("/i/:invite_code", func(c *gin.Context) {
+		inviteCode := strings.TrimSpace(c.Param("invite_code"))
+		if inviteCode != "" {
+			c.SetCookie("invite_code", inviteCode, 60*60*24*30, "/", "", false, true)
+		}
+		c.Redirect(http.StatusFound, "/")
+	})
+	if fetcher != nil {
+		router.GET("/__ssr_data", func(c *gin.Context) {
+			pathValue := c.Query("path")
+			if pathValue == "" {
+				pathValue = "/"
+			}
+
+			targetURL, err := url.Parse(pathValue)
+			if err != nil {
+				c.Status(http.StatusBadRequest)
+				return
+			}
+
+			cloned := c.Request.Clone(c.Request.Context())
+			cloned.URL = targetURL
+			cloned.RequestURI = targetURL.RequestURI()
+
+			payload, err := fetcher(cloned.Context(), cloned)
+			if err != nil {
+				log.Println(err)
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			data := payloadToMap(payload)
+			if session := sessionStateFromRequest(cloned); session != nil {
+				data["session"] = session
+			}
+			if locale := localeFromPath(targetURL.Path); locale != "" {
+				data["locale"] = locale
+			}
+
+			if origin := requestOrigin(c.Request); origin != "" {
+				data["siteOrigin"] = origin
+			}
+
+			c.JSON(http.StatusOK, data)
+		})
+	}
+
+	var (
+		indexHTML string
+		ssr       *renderer.Renderer
+		proxy     *httputil.ReverseProxy
+	)
+
+	if devMode {
+		proxy = newDevProxy(devServerURL())
+		log.Printf("Development mode enabled. Proxying to %s", devServerURL())
+		router.NoRoute(func(c *gin.Context) {
+			proxy.ServeHTTP(c.Writer, c.Request)
+		})
+	} else {
+		indexBytes, err := readFSFile(frontendBuild.FrontendDist, "index.html")
+		if err != nil {
+			log.Fatalf("failed to read index.html: %v", err)
+		}
+		indexHTML = string(indexBytes)
+
+		serverEntry, err := readFSFile(frontendBuild.ServerDist, "server.js")
+		if err != nil {
+			log.Fatalf("failed to read server.js: %v", err)
+		}
+		ssr = renderer.NewRenderer(string(serverEntry))
+
+		assetsFS, err := fs.Sub(frontendBuild.FrontendDist, "assets")
+		if err != nil {
+			log.Fatalf("failed to prepare assets filesystem: %v", err)
+		}
+
+		router.StaticFS("/assets", http.FS(assetsFS))
+
+		router.NoRoute(func(c *gin.Context) {
+			var (
+				payload    routematcher.SSRPayload
+				payloadMap map[string]any
+				err        error
+			)
+
+			if fetcher != nil {
+				payload, err = fetcher(c.Request.Context(), c.Request)
+				if err != nil {
+					log.Println(err)
+					c.Status(http.StatusInternalServerError)
+					return
+				}
+			}
+
+			payloadMap = payloadToMap(payload)
+			if session := sessionStateFromRequest(c.Request); session != nil {
+				payloadMap["session"] = session
+			}
+
+			locale := localeFromPath(c.Request.URL.Path)
+			if locale != "" {
+				payloadMap["locale"] = locale
+			}
+
+			if origin := requestOrigin(c.Request); origin != "" {
+				payloadMap["siteOrigin"] = origin
+			}
+
+			result, err := ssr.Render(c.Request.URL.Path, payloadMap)
+			if err != nil {
+				log.Println(err)
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			page := strings.Replace(indexHTML, "<!--app-html-->", result.HTML, 1)
+			if locale != "" {
+				page = applyHTMLLang(page, locale)
+			}
+			page = injectHeadContent(page, result.Head)
+			page, injectErr := injectSSRData(page, payloadMap)
+			if injectErr != nil {
+				log.Println(injectErr)
+			}
+
+			c.Header("Content-Type", "text/html")
+			c.String(http.StatusOK, page)
+		})
+	}
+}
+
+func applyHTMLLang(html string, locale string) string {
+	locale = strings.TrimSpace(locale)
+	if locale == "" {
+		return html
+	}
+
+	replacement := fmt.Sprintf(`lang="%s"`, locale)
+	if langAttributePattern.MatchString(html) {
+		return langAttributePattern.ReplaceAllString(html, replacement)
+	}
+
+	if strings.Contains(html, "<html") {
+		return strings.Replace(html, "<html", "<html "+replacement, 1)
+	}
+
+	return html
+}
+
+func injectHeadContent(html string, head string) string {
+	if strings.TrimSpace(head) == "" {
+		return html
+	}
+
+	injection := head
+	if !strings.HasSuffix(injection, "\n") {
+		injection += "\n"
+	}
+
+	if strings.Contains(html, "</head>") {
+		return strings.Replace(html, "</head>", injection+"</head>", 1)
+	}
+
+	return injection + html
+}
+
+func injectSSRData(html string, payload map[string]any) (string, error) {
+	if len(payload) == 0 {
+		return html, nil
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return html, err
+	}
+
+	escaped := template.JSEscapeString(string(jsonData))
+	script := fmt.Sprintf(`<script id="ssr-data">window.__SSR_DATA__=JSON.parse("%s")</script>`, escaped)
+
+	if strings.Contains(html, "</head>") {
+		return strings.Replace(html, "</head>", script+"</head>", 1), nil
+	}
+
+	if strings.Contains(html, "</body>") {
+		return strings.Replace(html, "</body>", script+"</body>", 1), nil
+	}
+
+	return html + script, nil
+}
+
+func payloadToMap(payload routematcher.SSRPayload) map[string]any {
+	if payload == nil {
+		return map[string]any{}
+	}
+
+	if m := payload.AsMap(); m != nil {
+		return m
+	}
+
+	return map[string]any{}
+}
+
+type ssrSessionPayload struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Provider string `json:"provider"`
+	IssuedAt int64  `json:"iat"`
+}
+
+func sessionStateFromRequest(r *http.Request) map[string]any {
+	cookie, err := r.Cookie("session_token")
+	if err != nil || cookie.Value == "" {
+		return nil
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		return nil
+	}
+
+	var payload ssrSessionPayload
+	if err := json.Unmarshal(decoded, &payload); err != nil {
+		return nil
+	}
+
+	if payload.Email == "" {
+		return nil
+	}
+
+	return map[string]any{
+		"session_token": cookie.Value,
+		"user": map[string]any{
+			"id":       payload.ID,
+			"name":     payload.Name,
+			"email":    payload.Email,
+			"provider": payload.Provider,
+		},
+	}
+}
+
+func readFSFile(f fs.FS, name string) ([]byte, error) {
+	file, err := f.Open(name)
+	if err != nil {
+		return nil, err
+	}
+
+	contents, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return contents, nil
+}
+
+func localeFromPath(p string) string {
+	trimmed := strings.Trim(p, "/")
+	if trimmed == "" {
+		return locales.Default
+	}
+
+	segments := strings.Split(trimmed, "/")
+	if len(segments) == 0 {
+		return locales.Default
+	}
+
+	candidate := segments[0]
+	if locales.IsSupported(candidate) {
+		return locales.Normalize(candidate)
+	}
+
+	return locales.Default
+}
+
+func requestOrigin(r *http.Request) string {
+	host := r.Host
+	if host == "" {
+		return ""
+	}
+
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		parts := strings.Split(proto, ",")
+		if len(parts) > 0 {
+			scheme = strings.TrimSpace(parts[0])
+		}
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+func isDevMode() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("DEV_MODE"))) {
+	case "1", "true", "yes", "on", "dev":
+		return true
+	default:
+		return false
+	}
+}
+
+func devServerURL() string {
+	if raw := strings.TrimSpace(os.Getenv("DEV_SERVER_URL")); raw != "" {
+		return raw
+	}
+
+	return "http://127.0.0.1:3333"
+}
+
+func newDevProxy(rawURL string) *httputil.ReverseProxy {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		log.Fatalf("invalid DEV_SERVER_URL %q: %v", rawURL, err)
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(parsed)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		log.Printf("dev proxy error: %v", err)
+		http.Error(w, "dev server unavailable", http.StatusBadGateway)
+	}
+
+	return proxy
+}

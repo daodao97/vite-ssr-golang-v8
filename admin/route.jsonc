@@ -1,0 +1,32 @@
+[
+  {
+    "id": 0,
+    "routes": [
+      {
+        "module_id": 0,
+        "name": "邮箱号池",
+        "type": 2,
+        "path": "/team_mails",
+        "icon": "ra-office-supplies",
+        "page_type": 7
+      },
+      {
+        "module_id": 0,
+        "name": "兑换码",
+        "type": 2,
+        "path": "/team_redeem",
+        "icon": "ra-office-supplies",
+        "page_type": 7
+      },
+      {
+        "module_id": 0,
+        "name": "管理员",
+        "type": 2,
+        "path": "/operator",
+        "icon": "ra-office-supplies",
+        "page_type": 7,
+        "role": "root"
+      }
+    ]
+  }
+]

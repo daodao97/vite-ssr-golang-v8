@@ -1,0 +1,18 @@
+database:
+  - name: default
+    driver: mysql
+    dsn: root:root@tcp(127.0.0.1:3306)/new_project?charset=utf8mb4&parseTime=True&loc=Local
+
+redis:
+  - name: default
+    addr: 127.0.0.1:6379
+
+google_oauth:
+  client_id: xxxxxxxx.apps.googleusercontent.com
+  client_secret: GOCSPX-XXXXXX
+project:
+  app_id: ""
+email:
+  resend_api_key: re_Wdd51EVC_KPgNbpJXLGM77ByZNSc978eN
+  from_address: onboarding@resend.dev
+  subject: Your verification code

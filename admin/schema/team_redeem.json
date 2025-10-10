@@ -1,0 +1,84 @@
+{
+  "orderBy": {
+    "field": "id",
+    "mod": "desc"
+  },
+  "formItems": [
+    {
+      "field": "redeem",
+      "label": "兑换码",
+      "type": "input",
+      "rules": "required"
+    },
+    {
+      "field": "used_by",
+      "label": "使用者(邮箱)",
+      "type": "input",
+      "placeholder": "留空表示未使用"
+    }
+  ],
+  "filter": [
+    {
+      "field": "id",
+      "label": "ID"
+    },
+    {
+      "field": "redeem",
+      "label": "兑换码"
+    },
+    {
+      "field": "used_by",
+      "label": "使用者"
+    }
+  ],
+  "headers": [
+    {
+      "field": "id",
+      "label": "ID",
+      "sortable": true
+    },
+    {
+      "field": "redeem",
+      "label": "兑换码"
+    },
+    {
+      "field": "used_by",
+      "label": "使用者"
+    },
+    {
+      "field": "created_at",
+      "label": "创建时间"
+    },
+    {
+      "field": "updated_at",
+      "label": "更新时间"
+    }
+  ],
+  "normalButton": [
+    {
+      "extra": {
+        "type": "RedeemCode"
+      },
+      "text": "批量添加",
+      "type": "modal"
+    },
+    {
+      "props": {
+        "type": "success"
+      },
+      "target": "/team_redeem/form",
+      "text": "新增",
+      "type": "jump"
+    }
+  ],
+  "rowButton": [
+    {
+      "props": {
+        "type": "primary"
+      },
+      "target": "/team_redeem/{id}",
+      "text": "编辑",
+      "type": "jump"
+    }
+  ]
+}
