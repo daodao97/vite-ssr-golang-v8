@@ -4,13 +4,12 @@ import (
 	"github.com/daodao97/xgo/xapp"
 	"github.com/gin-gonic/gin"
 
-	loginapi "github.com/revenkroz/vite-ssr-golang/api/login"
+	loginapi "vitego/api/login"
 )
 
 func SetupRouter(r *gin.Engine) {
 	g := r.Group("/api")
 
-	g.GET("/example", xapp.HanderFunc(Exmaple))
 	g.POST("/auth/login/google", xapp.HanderFunc(loginapi.AuthLoginGoogle))
 	g.POST("/auth/login/email/request", xapp.HanderFunc(loginapi.AuthRequestEmailCode))
 	g.POST("/auth/login/email/verify", xapp.HanderFunc(loginapi.AuthVerifyEmailCode))

@@ -1,9 +1,9 @@
-module github.com/revenkroz/vite-ssr-golang
+module vitego
 
 go 1.25
 
 require (
-	github.com/daodao97/xgo v0.0.0-20251001075919-24a0bf918f66
+	github.com/daodao97/xgo v0.0.0-20251022131801-e84077b1434d
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/redis/go-redis/v9 v9.14.0

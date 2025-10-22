@@ -1,7 +1,7 @@
 package dao
 
 import (
-	"github.com/revenkroz/vite-ssr-golang/conf"
+	"vitego/conf"
 
 	"github.com/daodao97/xgo/xdb"
 	_ "github.com/go-sql-driver/mysql"

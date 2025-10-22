@@ -18,8 +18,8 @@ import (
 	"github.com/daodao97/xgo/xrequest"
 	"github.com/gin-gonic/gin"
 
-	projectconf "github.com/revenkroz/vite-ssr-golang/conf"
-	"github.com/revenkroz/vite-ssr-golang/dao"
+	projectconf "vitego/conf"
+	"vitego/dao"
 )
 
 const (

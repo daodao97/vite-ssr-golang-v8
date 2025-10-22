@@ -2,9 +2,12 @@ root = "."
 testdata_dir = "testdata"
 tmp_dir = "tmp"
 
+[env]
+  DISABLE_CRON=true
+
 [build]
   args_bin = ["--app-env", "dev"]
-  bin = "./tmp/main"
+  bin = ";DISABLE_CRON=true ./tmp/main"
   cmd = "go build -o ./tmp/main ."
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "webssr", "vitesse", "build", "dist", "admin/adminui"]

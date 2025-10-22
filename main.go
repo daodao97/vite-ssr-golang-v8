@@ -10,19 +10,20 @@ import (
 	"os"
 	"time"
 
+	"vitego/admin"
+	"vitego/api"
+	"vitego/conf"
+	"vitego/dao"
+	"vitego/job"
+	"vitego/pkg"
+	"vitego/pkg/locales"
+	"vitego/pkg/routematcher"
+
 	"github.com/daodao97/xgo/xapp"
 	"github.com/daodao97/xgo/xlog"
 	"github.com/daodao97/xgo/xredis"
 	"github.com/daodao97/xgo/xrequest"
 	"github.com/gin-gonic/gin"
-	"github.com/revenkroz/vite-ssr-golang/admin"
-	"github.com/revenkroz/vite-ssr-golang/api"
-	"github.com/revenkroz/vite-ssr-golang/conf"
-	"github.com/revenkroz/vite-ssr-golang/dao"
-	"github.com/revenkroz/vite-ssr-golang/job"
-	"github.com/revenkroz/vite-ssr-golang/pkg"
-	"github.com/revenkroz/vite-ssr-golang/pkg/locales"
-	"github.com/revenkroz/vite-ssr-golang/pkg/routematcher"
 )
 
 //go:embed all:dist/client

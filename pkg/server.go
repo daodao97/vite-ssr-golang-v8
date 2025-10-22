@@ -16,10 +16,11 @@ import (
 	"regexp"
 	"strings"
 
+	"vitego/pkg/locales"
+	"vitego/pkg/renderer"
+	"vitego/pkg/routematcher"
+
 	"github.com/gin-gonic/gin"
-	"github.com/revenkroz/vite-ssr-golang/pkg/locales"
-	"github.com/revenkroz/vite-ssr-golang/pkg/renderer"
-	"github.com/revenkroz/vite-ssr-golang/pkg/routematcher"
 )
 
 type FrontendBuild struct {

@@ -3,9 +3,9 @@ package admin
 import (
 	"embed"
 
-	"github.com/revenkroz/vite-ssr-golang/admin/adminui"
-	"github.com/revenkroz/vite-ssr-golang/admin/hook"
-	"github.com/revenkroz/vite-ssr-golang/api"
+	"vitego/admin/adminui"
+	"vitego/admin/hook"
+	"vitego/api"
 
 	"github.com/daodao97/xgo/xadmin"
 	"github.com/daodao97/xgo/xapp"

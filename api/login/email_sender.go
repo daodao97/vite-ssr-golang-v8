@@ -9,7 +9,7 @@ import (
 
 	"github.com/resend/resend-go/v2"
 
-	projectconf "github.com/revenkroz/vite-ssr-golang/conf"
+	projectconf "vitego/conf"
 )
 
 type EmailSender interface {
