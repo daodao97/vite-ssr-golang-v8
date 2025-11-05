@@ -11,17 +11,26 @@ import VueRouter from 'unplugin-vue-router/vite'
 import { VueRouterAutoImports } from 'unplugin-vue-router'
 import Layouts from 'vite-plugin-vue-layouts'
 
+const lifecycleEvent = process.env.npm_lifecycle_event
+const cdnEnv = process.env.CND_URL ?? process.env.CDN_URL
+const normalizedCdnBase = cdnEnv ? `${cdnEnv.replace(/\/?$/, '/')}` : undefined
+
+const base = lifecycleEvent === 'build:client' && normalizedCdnBase
+  ? normalizedCdnBase
+  : '/'
+
 export default defineConfig({
+  base,
   server: {
     host: '127.0.0.1',
     port: 3333,
     proxy: {
       '/__ssr_data': {
-        target: 'http://127.0.0.1:4001',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
       '/api': {
-        target: 'http://127.0.0.1:4001',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
     },

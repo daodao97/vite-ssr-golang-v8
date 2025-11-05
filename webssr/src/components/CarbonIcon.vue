@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  name: 'warning' | 'campsite' | 'pedestrian' | 'logo-github' | 'sun' | 'moon'
+  name: 'warning' | 'campsite' | 'pedestrian' | 'logo-github' | 'sun' | 'moon' | 'menu' | 'close'
 }>()
 
 const ICONS: Record<typeof props.name, { width: number; height: number; body: string }> = {
@@ -35,6 +35,16 @@ const ICONS: Record<typeof props.name, { width: number; height: number; body: st
     width: 32,
     height: 32,
     body: '<path fill="currentColor" d="M13.503 5.414a15.076 15.076 0 0 0 11.593 18.194a11.1 11.1 0 0 1-7.975 3.39c-.138 0-.278.005-.418 0a11.094 11.094 0 0 1-3.2-21.584M14.98 3a1 1 0 0 0-.175.016a13.096 13.096 0 0 0 1.825 25.981c.164.006.328 0 .49 0a13.07 13.07 0 0 0 10.703-5.555a1.01 1.01 0 0 0-.783-1.565A13.08 13.08 0 0 1 15.89 4.38A1.015 1.015 0 0 0 14.98 3"/>'
+  },
+  menu: {
+    width: 32,
+    height: 32,
+    body: '<path fill="currentColor" d="M4 8h24v2H4zm0 7h24v2H4zm0 7h24v2H4z"/>'
+  },
+  close: {
+    width: 32,
+    height: 32,
+    body: '<path fill="currentColor" d="m24.59 7.41-8.59 8.59-8.59-8.59L6 9l8.59 8.59L6 26.17L7.41 27.6l8.59-8.59l8.59 8.59l1.41-1.41l-8.59-8.59L26 9z"/>'
   }
 }
 

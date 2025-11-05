@@ -25,6 +25,8 @@
   "marketing.header.language": "Select language",
   "marketing.header.current": "Active",
   "marketing.header.toggleTheme": "Toggle theme",
+  "marketing.header.openMenu": "Open navigation",
+  "marketing.header.closeMenu": "Close navigation",
   "marketing.header.userMenu.title": "Signed in",
   "marketing.header.userMenu.logout": "Log out",
   "marketing.header.userMenu.defaultName": "User",

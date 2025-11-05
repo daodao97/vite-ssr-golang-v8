@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router/auto'
 import { storeToRefs } from 'pinia'
@@ -27,8 +27,18 @@ const navItems = computed(() => [
   { label: t('marketing.nav.resources'), href: '#resources' },
 ])
 
+const isMobileMenuOpen = ref(false)
+
 function handleLogoClick() {
   push({ name: '/' })
+}
+
+function toggleMobileMenu() {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value
+}
+
+function handleMobileNavClick() {
+  isMobileMenuOpen.value = false
 }
 </script>
 
@@ -79,7 +89,43 @@ function handleLogoClick() {
             </Button>
           </LoginAction>
         </template>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          class="rounded-full border border-border/60 lg:hidden"
+          :title="isMobileMenuOpen ? t('marketing.header.closeMenu') : t('marketing.header.openMenu')"
+          :aria-label="isMobileMenuOpen ? t('marketing.header.closeMenu') : t('marketing.header.openMenu')"
+          :aria-expanded="isMobileMenuOpen"
+          aria-controls="marketing-mobile-nav"
+          @click="toggleMobileMenu()"
+        >
+          <CarbonIcon :name="isMobileMenuOpen ? 'close' : 'menu'" class="h-4 w-4" />
+        </Button>
       </div>
     </div>
+    <nav
+      v-show="isMobileMenuOpen"
+      id="marketing-mobile-nav"
+      class="border-t border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:hidden"
+      :aria-hidden="!isMobileMenuOpen"
+    >
+      <div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 text-base font-medium text-foreground">
+        <a
+          v-for="item in navItems"
+          :key="item.href"
+          :href="item.href"
+          class="block rounded-md px-2 py-2 transition-colors hover:bg-muted/60"
+          @click="handleMobileNavClick"
+        >
+          {{ item.label }}
+        </a>
+        <LoginAction v-if="!isAuthenticated">
+          <Button size="sm" class="w-full justify-center" variant="outline" @click="handleMobileNavClick">
+            {{ t('marketing.header.login') }}
+          </Button>
+        </LoginAction>
+      </div>
+    </nav>
   </header>
 </template>

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -18,6 +17,7 @@ import (
 	"vitego/pkg"
 	"vitego/pkg/locales"
 	"vitego/pkg/routematcher"
+	"vitego/webssr"
 
 	"github.com/daodao97/xgo/xapp"
 	"github.com/daodao97/xgo/xlog"
@@ -25,12 +25,6 @@ import (
 	"github.com/daodao97/xgo/xrequest"
 	"github.com/gin-gonic/gin"
 )
-
-//go:embed all:dist/client
-var frontendDist embed.FS
-
-//go:embed all:dist/server
-var serverDist embed.FS
 
 var Version string
 
@@ -54,8 +48,11 @@ func main() {
 			},
 			dao.Init,
 		).
-		AddServer(xapp.NewGinHttpServer(xapp.Args.Bind, h)).
-		AddServer(job.NewCronServer())
+		AddServer(xapp.NewGinHttpServer(xapp.Args.Bind, h))
+
+	if os.Getenv("CRON_ENABLE") == "true" {
+		app.AddServer(job.NewCronServer())
+	}
 
 	if err := app.Run(); err != nil {
 		panic(err)
@@ -79,8 +76,8 @@ func h() *gin.Engine {
 }
 
 func vueSsr(r *gin.Engine) {
-	fsysFrontend, _ := fs.Sub(frontendDist, "dist/client")
-	fsysServer, _ := fs.Sub(serverDist, "dist/server")
+	fsysFrontend, _ := fs.Sub(webssr.FrontendDist, "dist/client")
+	fsysServer, _ := fs.Sub(webssr.ServerDist, "dist/server")
 
 	matcher := routematcher.New([]routematcher.Route{
 		routematcher.RouteOf("/", func(_ context.Context, _ map[string]string, _ url.Values) (homePayload, error) {

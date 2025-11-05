@@ -25,6 +25,8 @@
   "marketing.header.language": "选择语言",
   "marketing.header.current": "当前",
   "marketing.header.toggleTheme": "切换主题",
+  "marketing.header.openMenu": "展开导航",
+  "marketing.header.closeMenu": "收起导航",
   "marketing.header.userMenu.title": "当前账号",
   "marketing.header.userMenu.logout": "退出登录",
   "marketing.header.userMenu.defaultName": "用户",

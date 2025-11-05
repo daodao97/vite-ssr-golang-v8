@@ -1,7 +1,6 @@
 package job
 
 import (
-	"os"
 	"time"
 
 	"github.com/daodao97/xgo/xapp"
@@ -11,9 +10,6 @@ import (
 
 func NewCronServer() xapp.NewServer {
 	return func() xapp.Server {
-		if os.Getenv("DISABLE_CRON") == "true" {
-			return xcron.New2()
-		}
 		return xcron.New2(
 			xcron.WithJobs(
 				xcron.Job{
