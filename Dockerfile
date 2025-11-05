@@ -1,5 +1,6 @@
 # Global ARGs
 ARG FRONTEND_DIR=webssr
+ARG ADMINUI_DIR=adminui
 ARG PNPM_VERSION=10.18.1
 
 # ----------------------------------------------------

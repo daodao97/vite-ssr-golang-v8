@@ -3,8 +3,8 @@ package admin
 import (
 	"embed"
 
-	"vitego/admin/adminui"
 	"vitego/admin/hook"
+	"vitego/adminui"
 	"vitego/api"
 
 	"github.com/daodao97/xgo/xadmin"
