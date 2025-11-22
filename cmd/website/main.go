@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 
@@ -94,48 +92,71 @@ func vueSsr(r *gin.Engine) {
 const ssrFetchPrefix = pkg.DefaultSSRFetchPrefix
 
 func registerSSRFetchRoutes(r *gin.Engine) pkg.BackendDataFetcher {
-	group := r.Group(ssrFetchPrefix)
+	group := r.Group(ssrFetchPrefix, ssrGuardMiddleware())
 	page.Router(group)
 
 	return func(ctx context.Context, req *http.Request) (pkg.SSRPayload, error) {
-		cloned := req.Clone(ctx)
-
-		originalPath := req.URL.Path
-		if !strings.HasPrefix(originalPath, "/") {
-			originalPath = "/" + originalPath
-		}
-
-		ssrPath := ssrFetchPrefix + originalPath
-		cloned.URL.Path = ssrPath
-		cloned.URL.RawPath = ""
-		cloned.URL.RawQuery = req.URL.RawQuery
-		cloned.RequestURI = ssrPath
-		if cloned.URL.RawQuery != "" {
-			cloned.RequestURI += "?" + cloned.URL.RawQuery
-		}
-
-		recorder := httptest.NewRecorder()
-		r.ServeHTTP(recorder, cloned)
-
-		res := recorder.Result()
-		defer res.Body.Close()
-
-		if res.StatusCode == http.StatusNotFound {
-			return mapPayload{}, nil
-		}
-
-		if res.StatusCode >= 400 {
-			body, _ := io.ReadAll(res.Body)
-			return nil, fmt.Errorf("ssr fetch %s returned %d: %s", ssrPath, res.StatusCode, strings.TrimSpace(string(body)))
-		}
-
-		var data map[string]any
-		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
+		payload, status, err := page.Resolve(ctx, req.URL.Path, req.URL.RawQuery)
+		if err != nil {
 			return nil, err
 		}
 
-		return mapPayload(data), nil
+		switch status {
+		case http.StatusOK:
+			return payload, nil
+		case http.StatusNotFound:
+			return mapPayload{}, nil
+		default:
+			return nil, fmt.Errorf("ssr fetch %s returned status %d", req.URL.Path, status)
+		}
 	}
+}
+
+func ssrGuardMiddleware() gin.HandlerFunc {
+	sharedToken := strings.TrimSpace(os.Getenv("SSR_FETCH_TOKEN"))
+
+	return func(c *gin.Context) {
+		flagHeader := c.GetHeader("X-SSR-Fetch") == "1"
+		originOK := sameOriginRequest(c.Request)
+
+		if sharedToken != "" && c.GetHeader("X-SSR-Token") != sharedToken {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		// 允许同源请求；若非同源则必须显式标头
+		if !originOK && !flagHeader {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func sameOriginRequest(r *http.Request) bool {
+	host := r.Host
+	if xf := r.Header.Get("X-Forwarded-Host"); xf != "" {
+		parts := strings.Split(xf, ",")
+		if len(parts) > 0 {
+			host = strings.TrimSpace(parts[0])
+		}
+	}
+
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = r.Header.Get("Referer")
+	}
+	if origin == "" {
+		return true
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+
+	return strings.EqualFold(parsed.Host, host)
 }
 
 type mapPayload map[string]any

@@ -1,8 +1,14 @@
 package page
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"path"
+	"regexp"
+	"strings"
 	"time"
 
 	"vitego/pkg"
@@ -12,10 +18,45 @@ import (
 )
 
 func Router(group *gin.RouterGroup) {
-	group.GET("/", handleSSRFetch(Home))
-	group.GET("/hi/:name", handleSSRFetch(Hi))
-	group.GET("/:locale", handleSSRFetch(HomeLocale))
-	group.GET("/:locale/hi/:name", handleSSRFetch(HiLocale))
+	for _, rt := range ssrRoutes {
+		group.GET(rt.pattern, handleSSRFetch(rt.handler))
+	}
+}
+
+// Resolve 在服务端内部匹配路径并返回对应 payload，避免经过全局中间件产生副作用。
+// 返回值：payload，HTTP status（200/404/500），错误。
+func Resolve(ctx context.Context, rawPath, rawQuery string) (pkg.SSRPayload, int, error) {
+	cleanPath := path.Clean("/" + strings.TrimPrefix(strings.TrimSpace(rawPath), "/"))
+	query, _ := url.ParseQuery(rawQuery)
+
+	for _, rt := range ssrRoutes {
+		matches := rt.regex.FindStringSubmatch(cleanPath)
+		if len(matches) == 0 {
+			continue
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		req := httptest.NewRequest(http.MethodGet, cleanPath, http.NoBody)
+		req.URL.RawQuery = query.Encode()
+		c.Request = req.WithContext(ctx)
+
+		params := gin.Params{}
+		for i, name := range rt.params {
+			if len(matches) > i+1 {
+				params = append(params, gin.Param{Key: name, Value: matches[i+1]})
+			}
+		}
+		c.Params = params
+
+		payload, err := rt.handler(c)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		return payload, http.StatusOK, nil
+	}
+
+	return nil, http.StatusNotFound, nil
 }
 
 func handleSSRFetch(h func(*gin.Context) (pkg.SSRPayload, error)) gin.HandlerFunc {
@@ -154,5 +195,40 @@ func greetingByLocale(locale string, name string) string {
 		return fmt.Sprintf("你好，%s！", name)
 	default:
 		return fmt.Sprintf("Hello, %s!", name)
+	}
+}
+
+type ssrRoute struct {
+	pattern string
+	handler func(*gin.Context) (pkg.SSRPayload, error)
+	regex   *regexp.Regexp
+	params  []string
+}
+
+var ssrRoutes = []ssrRoute{
+	newSSRRoute("/", Home),
+	newSSRRoute("/hi/:name", Hi),
+	newSSRRoute("/:locale", HomeLocale),
+	newSSRRoute("/:locale/hi/:name", HiLocale),
+}
+
+func newSSRRoute(pattern string, handler func(*gin.Context) (pkg.SSRPayload, error)) ssrRoute {
+	segments := strings.Split(strings.Trim(pattern, "/"), "/")
+	paramNames := []string{}
+	for i, segment := range segments {
+		if strings.HasPrefix(segment, ":") {
+			name := strings.TrimPrefix(segment, ":")
+			paramNames = append(paramNames, name)
+			segments[i] = "([^/]+)"
+		}
+	}
+
+	regexPattern := fmt.Sprintf("^/%s$", strings.Join(segments, "/"))
+
+	return ssrRoute{
+		pattern: pattern,
+		handler: handler,
+		regex:   regexp.MustCompile(regexPattern),
+		params:  paramNames,
 	}
 }

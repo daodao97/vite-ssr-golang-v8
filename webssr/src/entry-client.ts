@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
     }
   })
 }
-const fullPath = window.location.pathname + window.location.search + window.location.hash
+const fullPath = window.location.pathname + window.location.search
 
 let isFirstNavigation = true
 
@@ -80,11 +80,13 @@ router.isReady().then(async () => {
 })
 
 async function fetchSsrData(path: string): Promise<Record<string, unknown>> {
-	const endpoint = `/__ssr_fetch${path}`
-	const response = await fetch(endpoint, {
-		credentials: 'same-origin',
-		headers: {
+  const url = new URL(path, window.location.origin)
+  const endpoint = `/__ssr_fetch${url.pathname}${url.search}`
+  const response = await fetch(endpoint, {
+    credentials: 'same-origin',
+    headers: {
       Accept: 'application/json',
+      'X-SSR-Fetch': '1',
     },
   })
 
