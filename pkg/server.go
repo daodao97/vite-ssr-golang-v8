@@ -14,7 +14,10 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"vitego/pkg/locales"
 	"vitego/pkg/renderer"
@@ -47,6 +50,7 @@ func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher Backen
 		indexHTML string
 		ssr       *renderer.Renderer
 		proxy     *httputil.ReverseProxy
+		renderSem chan struct{}
 	)
 
 	if devMode {
@@ -72,6 +76,12 @@ func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher Backen
 			log.Fatalf("failed to read server.js: %v", err)
 		}
 		ssr = renderer.NewRenderer(string(serverEntry))
+		prewarmRenderer(ssr)
+
+		renderLimit := renderConcurrencyLimit()
+		if renderLimit > 0 {
+			renderSem = make(chan struct{}, renderLimit)
+		}
 
 		assetsFS, err := fs.Sub(frontendBuild.FrontendDist, "assets")
 		if err != nil {
@@ -115,10 +125,15 @@ func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher Backen
 				payloadMap["siteOrigin"] = origin
 			}
 
-			result, err := ssr.Render(c.Request.URL.Path, payloadMap)
+			reqID := fmt.Sprintf("%d", time.Now().UnixNano())
+
+			result, err := renderWithTimeout(ssr, c.Request.URL.Path, payloadMap, 3*time.Second, renderSem)
 			if err != nil {
-				log.Println(err)
-				c.Status(http.StatusInternalServerError)
+				log.Printf("ssr render failed id=%s path=%s err=%v", reqID, c.Request.URL.Path, err)
+
+				fallback := buildFallbackPage(indexHTML, payloadMap, locale, reqID)
+				c.Header("Content-Type", "text/html")
+				c.String(http.StatusOK, fallback)
 				return
 			}
 
@@ -332,4 +347,71 @@ func newDevProxy(rawURL string) *httputil.ReverseProxy {
 	}
 
 	return proxy
+}
+
+func renderWithTimeout(ssr *renderer.Renderer, urlPath string, payload map[string]any, timeout time.Duration, sem chan struct{}) (renderer.Result, error) {
+	type renderResult struct {
+		result renderer.Result
+		err    error
+	}
+
+	ch := make(chan renderResult, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ch <- renderResult{err: fmt.Errorf("panic: %v", r)}
+			}
+		}()
+		if sem != nil {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+		}
+		res, err := ssr.Render(urlPath, payload)
+		ch <- renderResult{result: res, err: err}
+	}()
+
+	if timeout <= 0 {
+		timeout = 3 * time.Second
+	}
+
+	select {
+	case r := <-ch:
+		return r.result, r.err
+	case <-time.After(timeout):
+		return renderer.Result{}, fmt.Errorf("render timeout after %s", timeout)
+	}
+}
+
+func renderConcurrencyLimit() int {
+	if raw := strings.TrimSpace(os.Getenv("SSR_RENDER_LIMIT")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 0 {
+			return v
+		}
+	}
+	return runtime.GOMAXPROCS(0)
+}
+
+func prewarmRenderer(ssr *renderer.Renderer) {
+	go func() {
+		_, _ = ssr.Render("/", nil)
+	}()
+}
+
+func buildFallbackPage(indexHTML string, payload map[string]any, locale string, reqID string) string {
+	page := strings.Replace(indexHTML, "<!--app-html-->", `<div id="app"></div>`, 1)
+	if locale != "" {
+		page = applyHTMLLang(page, locale)
+	}
+
+	headMeta := ""
+	if strings.TrimSpace(reqID) != "" {
+		headMeta = fmt.Sprintf(`<meta name="ssr-error-id" content="%s">`, template.HTMLEscapeString(reqID))
+		page = injectHeadContent(page, headMeta)
+	}
+
+	if injected, err := injectSSRData(page, payload); err == nil {
+		return injected
+	}
+
+	return page
 }
