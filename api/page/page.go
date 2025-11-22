@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"vitego/pkg"
 	"vitego/pkg/locales"
-	"vitego/pkg/routematcher"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +18,7 @@ func Router(group *gin.RouterGroup) {
 	group.GET("/:locale/hi/:name", handleSSRFetch(HiLocale))
 }
 
-func handleSSRFetch(h func(*gin.Context) (routematcher.SSRPayload, error)) gin.HandlerFunc {
+func handleSSRFetch(h func(*gin.Context) (pkg.SSRPayload, error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		payload, err := h(c)
 		if err != nil {
@@ -35,7 +35,7 @@ func handleSSRFetch(h func(*gin.Context) (routematcher.SSRPayload, error)) gin.H
 	}
 }
 
-func Home(_ *gin.Context) (routematcher.SSRPayload, error) {
+func Home(_ *gin.Context) (pkg.SSRPayload, error) {
 	locale := locales.Default
 
 	return homePayload{
@@ -45,7 +45,7 @@ func Home(_ *gin.Context) (routematcher.SSRPayload, error) {
 	}, nil
 }
 
-func Hi(c *gin.Context) (routematcher.SSRPayload, error) {
+func Hi(c *gin.Context) (pkg.SSRPayload, error) {
 	locale := locales.Default
 	name := c.Param("name")
 	if name == "" {
@@ -64,7 +64,7 @@ func Hi(c *gin.Context) (routematcher.SSRPayload, error) {
 	}, nil
 }
 
-func HomeLocale(c *gin.Context) (routematcher.SSRPayload, error) {
+func HomeLocale(c *gin.Context) (pkg.SSRPayload, error) {
 	locale := locales.Normalize(paramLocale(c))
 
 	return homePayload{
@@ -74,7 +74,7 @@ func HomeLocale(c *gin.Context) (routematcher.SSRPayload, error) {
 	}, nil
 }
 
-func HiLocale(c *gin.Context) (routematcher.SSRPayload, error) {
+func HiLocale(c *gin.Context) (pkg.SSRPayload, error) {
 	locale := locales.Normalize(paramLocale(c))
 	name := c.Param("name")
 	if name == "" {

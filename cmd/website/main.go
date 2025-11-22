@@ -19,7 +19,6 @@ import (
 	"vitego/dao"
 	"vitego/job"
 	"vitego/pkg"
-	"vitego/pkg/routematcher"
 	"vitego/webssr"
 
 	"github.com/daodao97/xgo/xapp"
@@ -98,7 +97,7 @@ func registerSSRFetchRoutes(r *gin.Engine) pkg.BackendDataFetcher {
 	group := r.Group(ssrFetchPrefix)
 	page.Router(group)
 
-	return func(ctx context.Context, req *http.Request) (routematcher.SSRPayload, error) {
+	return func(ctx context.Context, req *http.Request) (pkg.SSRPayload, error) {
 		cloned := req.Clone(ctx)
 
 		originalPath := req.URL.Path

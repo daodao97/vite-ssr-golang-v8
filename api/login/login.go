@@ -244,7 +244,7 @@ func AuthLogout(ctx *gin.Context, _ ReqExample) (*RespAuthEmail, error) {
 func AuthSession(ctx *gin.Context, _ ReqExample) (*RespAuthLogin, error) {
 	token, err := ctx.Cookie("session_token")
 	if err != nil || token == "" {
-		return &RespAuthLogin{}, nil
+		return nil, nil
 	}
 
 	user, err := parseMockToken(token)

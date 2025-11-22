@@ -18,7 +18,6 @@ import (
 
 	"vitego/pkg/locales"
 	"vitego/pkg/renderer"
-	"vitego/pkg/routematcher"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,7 +27,7 @@ type FrontendBuild struct {
 	ServerDist   fs.FS
 }
 
-type BackendDataFetcher func(context.Context, *http.Request) (routematcher.SSRPayload, error)
+type BackendDataFetcher func(context.Context, *http.Request) (SSRPayload, error)
 
 const DefaultSSRFetchPrefix = "/__ssr_fetch"
 
@@ -43,45 +42,6 @@ func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher Backen
 		}
 		c.Redirect(http.StatusFound, "/")
 	})
-	if fetcher != nil {
-		router.GET("/__ssr_data", func(c *gin.Context) {
-			pathValue := c.Query("path")
-			if pathValue == "" {
-				pathValue = "/"
-			}
-
-			targetURL, err := url.Parse(pathValue)
-			if err != nil {
-				c.Status(http.StatusBadRequest)
-				return
-			}
-
-			cloned := c.Request.Clone(c.Request.Context())
-			cloned.URL = targetURL
-			cloned.RequestURI = targetURL.RequestURI()
-
-			payload, err := fetcher(cloned.Context(), cloned)
-			if err != nil {
-				log.Println(err)
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-
-			data := payloadToMap(payload)
-			if session := sessionStateFromRequest(cloned); session != nil {
-				data["session"] = session
-			}
-			if locale := localeFromPath(targetURL.Path); locale != "" {
-				data["locale"] = locale
-			}
-
-			if origin := requestOrigin(c.Request); origin != "" {
-				data["siteOrigin"] = origin
-			}
-
-			c.JSON(http.StatusOK, data)
-		})
-	}
 
 	var (
 		indexHTML string
@@ -127,7 +87,7 @@ func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher Backen
 			}
 
 			var (
-				payload    routematcher.SSRPayload
+				payload    SSRPayload
 				payloadMap map[string]any
 				err        error
 			)
@@ -237,7 +197,7 @@ func injectSSRData(html string, payload map[string]any) (string, error) {
 	return html + script, nil
 }
 
-func payloadToMap(payload routematcher.SSRPayload) map[string]any {
+func payloadToMap(payload SSRPayload) map[string]any {
 	if payload == nil {
 		return map[string]any{}
 	}
