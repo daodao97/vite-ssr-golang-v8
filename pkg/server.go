@@ -30,6 +30,8 @@ type FrontendBuild struct {
 
 type BackendDataFetcher func(context.Context, *http.Request) (routematcher.SSRPayload, error)
 
+const DefaultSSRFetchPrefix = "/__ssr_fetch"
+
 var langAttributePattern = regexp.MustCompile(`lang="[^"]*"`)
 
 func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher BackendDataFetcher) {
@@ -91,6 +93,11 @@ func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher Backen
 		proxy = newDevProxy(devServerURL())
 		log.Printf("Development mode enabled. Proxying to %s", devServerURL())
 		router.NoRoute(func(c *gin.Context) {
+			if strings.HasPrefix(c.Request.URL.Path, DefaultSSRFetchPrefix) {
+				c.Status(http.StatusNotFound)
+				return
+			}
+
 			proxy.ServeHTTP(c.Writer, c.Request)
 		})
 	} else {
@@ -114,6 +121,11 @@ func RunBlocking(router *gin.Engine, frontendBuild FrontendBuild, fetcher Backen
 		router.StaticFS("/assets", http.FS(assetsFS))
 
 		router.NoRoute(func(c *gin.Context) {
+			if strings.HasPrefix(c.Request.URL.Path, DefaultSSRFetchPrefix) {
+				c.Status(http.StatusNotFound)
+				return
+			}
+
 			var (
 				payload    routematcher.SSRPayload
 				payloadMap map[string]any

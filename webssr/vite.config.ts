@@ -29,6 +29,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
+      '/__ssr_fetch': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,

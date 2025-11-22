@@ -2,20 +2,23 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
-	"net/url"
+	"net/http"
+	"net/http/httptest"
 	"os"
-	"time"
+	"strings"
 
 	"vitego/admin"
 	"vitego/api"
+	"vitego/api/page"
 	"vitego/conf"
 	"vitego/dao"
 	"vitego/job"
 	"vitego/pkg"
-	"vitego/pkg/locales"
 	"vitego/pkg/routematcher"
 	"vitego/webssr"
 
@@ -76,139 +79,68 @@ func h() *gin.Engine {
 }
 
 func vueSsr(r *gin.Engine) {
-	fsysFrontend, _ := fs.Sub(webssr.FrontendDist, "dist/client")
-	fsysServer, _ := fs.Sub(webssr.ServerDist, "dist/server")
-
-	matcher := routematcher.New([]routematcher.Route{
-		routematcher.RouteOf("/", func(_ context.Context, _ map[string]string, _ url.Values) (homePayload, error) {
-			locale := locales.Default
-
-			return homePayload{
-				Announcement: announcementByLocale(locale),
-				ServerTime:   time.Now().Format(time.RFC1123Z),
-				Locale:       locale,
-			}, nil
-		}),
-		routematcher.RouteOf("/hi/:name", func(_ context.Context, params map[string]string, query url.Values) (greetingPayload, error) {
-			locale := locales.Default
-			name := params["name"]
-			if name == "" {
-				name = defaultName(locale)
-			}
-
-			salutation := query.Get("title")
-			if salutation != "" {
-				name = fmt.Sprintf("%s %s", salutation, name)
-			}
-
-			return greetingPayload{
-				Greeting:    greetingByLocale(locale, name),
-				GeneratedAt: time.Now().Format(time.RFC3339),
-				Locale:      locale,
-			}, nil
-		}),
-		routematcher.RouteOf("/:locale", func(_ context.Context, params map[string]string, _ url.Values) (homePayload, error) {
-			locale := locales.Normalize(paramsLocale(params))
-
-			return homePayload{
-				Announcement: announcementByLocale(locale),
-				ServerTime:   time.Now().Format(time.RFC1123Z),
-				Locale:       locale,
-			}, nil
-		}),
-		routematcher.RouteOf("/:locale/hi/:name", func(_ context.Context, params map[string]string, query url.Values) (greetingPayload, error) {
-			locale := locales.Normalize(paramsLocale(params))
-			name := params["name"]
-			if name == "" {
-				name = defaultName(locale)
-			}
-
-			salutation := query.Get("title")
-			if salutation != "" {
-				name = fmt.Sprintf("%s %s", salutation, name)
-			}
-
-			return greetingPayload{
-				Greeting:    greetingByLocale(locale, name),
-				GeneratedAt: time.Now().Format(time.RFC3339),
-				Locale:      locale,
-			}, nil
-		}),
-	})
+	fsyFrontend, _ := fs.Sub(webssr.FrontendDist, "dist/client")
+	fsyServer, _ := fs.Sub(webssr.ServerDist, "dist/server")
 
 	pkg.RunBlocking(
 		r,
 		pkg.FrontendBuild{
-			FrontendDist: fsysFrontend,
-			ServerDist:   fsysServer,
+			FrontendDist: fsyFrontend,
+			ServerDist:   fsyServer,
 		},
-		matcher.Fetch,
+		registerSSRFetchRoutes(r),
 	)
 }
 
-type greetingPayload struct {
-	Greeting    string
-	GeneratedAt string
-	Locale      string
-}
+const ssrFetchPrefix = pkg.DefaultSSRFetchPrefix
 
-func (g greetingPayload) AsMap() map[string]any {
-	return map[string]any{
-		"greeting":    g.Greeting,
-		"generatedAt": g.GeneratedAt,
-		"locale":      g.Locale,
+func registerSSRFetchRoutes(r *gin.Engine) pkg.BackendDataFetcher {
+	group := r.Group(ssrFetchPrefix)
+	page.Router(group)
+
+	return func(ctx context.Context, req *http.Request) (routematcher.SSRPayload, error) {
+		cloned := req.Clone(ctx)
+
+		originalPath := req.URL.Path
+		if !strings.HasPrefix(originalPath, "/") {
+			originalPath = "/" + originalPath
+		}
+
+		ssrPath := ssrFetchPrefix + originalPath
+		cloned.URL.Path = ssrPath
+		cloned.URL.RawPath = ""
+		cloned.URL.RawQuery = req.URL.RawQuery
+		cloned.RequestURI = ssrPath
+		if cloned.URL.RawQuery != "" {
+			cloned.RequestURI += "?" + cloned.URL.RawQuery
+		}
+
+		recorder := httptest.NewRecorder()
+		r.ServeHTTP(recorder, cloned)
+
+		res := recorder.Result()
+		defer res.Body.Close()
+
+		if res.StatusCode == http.StatusNotFound {
+			return mapPayload{}, nil
+		}
+
+		if res.StatusCode >= 400 {
+			body, _ := io.ReadAll(res.Body)
+			return nil, fmt.Errorf("ssr fetch %s returned %d: %s", ssrPath, res.StatusCode, strings.TrimSpace(string(body)))
+		}
+
+		var data map[string]any
+		if err := json.NewDecoder(res.Body).Decode(&data); err != nil {
+			return nil, err
+		}
+
+		return mapPayload(data), nil
 	}
 }
 
-type homePayload struct {
-	Announcement string
-	ServerTime   string
-	Locale       string
-}
+type mapPayload map[string]any
 
-func (h homePayload) AsMap() map[string]any {
-	return map[string]any{
-		"announcement": h.Announcement,
-		"serverTime":   h.ServerTime,
-		"locale":       h.Locale,
-	}
-}
-
-func paramsLocale(params map[string]string) string {
-	if params == nil {
-		return locales.Default
-	}
-
-	if value, ok := params["locale"]; ok {
-		return value
-	}
-
-	return locales.Default
-}
-
-func announcementByLocale(locale string) string {
-	switch locale {
-	case "zh-CN":
-		return "欢迎体验 Go + Vite SSR 示例"
-	default:
-		return "Welcome to the Go + Vite SSR demo"
-	}
-}
-
-func defaultName(locale string) string {
-	switch locale {
-	case "zh-CN":
-		return "朋友"
-	default:
-		return "friend"
-	}
-}
-
-func greetingByLocale(locale string, name string) string {
-	switch locale {
-	case "zh-CN":
-		return fmt.Sprintf("你好，%s！", name)
-	default:
-		return fmt.Sprintf("Hello, %s!", name)
-	}
+func (m mapPayload) AsMap() map[string]any {
+	return m
 }

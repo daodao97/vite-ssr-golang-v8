@@ -80,10 +80,10 @@ router.isReady().then(async () => {
 })
 
 async function fetchSsrData(path: string): Promise<Record<string, unknown>> {
-  const endpoint = `/__ssr_data?path=${encodeURIComponent(path)}`
-  const response = await fetch(endpoint, {
-    credentials: 'same-origin',
-    headers: {
+	const endpoint = `/__ssr_fetch${path}`
+	const response = await fetch(endpoint, {
+		credentials: 'same-origin',
+		headers: {
       Accept: 'application/json',
     },
   })
