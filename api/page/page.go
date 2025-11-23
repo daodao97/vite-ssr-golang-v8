@@ -216,8 +216,8 @@ func newSSRRoute(pattern string, handler func(*gin.Context) (pkg.SSRPayload, err
 	segments := strings.Split(strings.Trim(pattern, "/"), "/")
 	paramNames := []string{}
 	for i, segment := range segments {
-		if strings.HasPrefix(segment, ":") {
-			name := strings.TrimPrefix(segment, ":")
+		if after, ok := strings.CutPrefix(segment, ":"); ok {
+			name := after
 			paramNames = append(paramNames, name)
 			segments[i] = "([^/]+)"
 		}

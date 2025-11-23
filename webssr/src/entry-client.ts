@@ -35,7 +35,7 @@ const fullPath = window.location.pathname + window.location.search
 
 let isFirstNavigation = true
 
-router.beforeResolve(async (to, from, next) => {
+router.beforeResolve(async (to: { fullPath: string }, from: { fullPath: any }, next: () => void) => {
   if (isFirstNavigation) {
     isFirstNavigation = false
     return next()

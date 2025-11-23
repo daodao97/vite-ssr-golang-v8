@@ -4,8 +4,6 @@ import { defineAsyncComponent } from 'vue'
 import app from './app'
 import { RegComponents } from '@okiss/vbtf'
 
-RegComponents({'GetRTAT': defineAsyncComponent(() => import('./components/GetRTAT.vue'))})
-RegComponents({'RedeemCode': defineAsyncComponent(() => import('./components/RedeemCode.vue'))})
 // register dashboard
 setCmp('dashboard', defineAsyncComponent(() => import('./views/dashboard/index.vue')))
 

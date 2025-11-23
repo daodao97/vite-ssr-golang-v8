@@ -21,6 +21,6 @@ type ReqExample struct{}
 
 type RespExample struct{}
 
-func Exmaple(ctx *gin.Context, req *ReqExample) (*ReqExample, error) {
+func Exmaple(ctx *gin.Context, req ReqExample) (*ReqExample, error) {
 	return &ReqExample{}, nil
 }
